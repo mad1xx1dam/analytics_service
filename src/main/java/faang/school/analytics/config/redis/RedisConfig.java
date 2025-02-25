@@ -1,6 +1,7 @@
-package faang.school.analytics.config.context;
+package faang.school.analytics.config.redis;
 
 import faang.school.analytics.message.FollowerEvenListener;
+import faang.school.analytics.message.ProjectViewEventListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,12 +16,13 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 @RequiredArgsConstructor
 public class RedisConfig {
+
     private final RedisConfigProperties redisConfigProperties;
 
     @Bean
     public JedisConnectionFactory jedisConnectionFactory() {
         RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration(
-                redisConfigProperties.getHost(), redisConfigProperties.getPort());
+                redisConfigProperties.host(), redisConfigProperties.port());
         return new JedisConnectionFactory(redisConfig);
     }
 
@@ -39,15 +41,27 @@ public class RedisConfig {
     }
 
     @Bean
-    ChannelTopic followerTopic() {
-        return new ChannelTopic(redisConfigProperties.getChannelFollower());
+    public MessageListenerAdapter messageProfileViewListener(ProjectViewEventListener projectViewEventListener) {
+        return new MessageListenerAdapter(projectViewEventListener);
     }
 
     @Bean
-    RedisMessageListenerContainer redisContainer(MessageListenerAdapter followerListener) {
+    ChannelTopic followerTopic() {
+        return new ChannelTopic(redisConfigProperties.channel().channelFollower());
+    }
+
+    @Bean
+    ChannelTopic profileViewTopic() {
+        return new ChannelTopic(redisConfigProperties.channel().profileView());
+    }
+
+    @Bean
+    RedisMessageListenerContainer redisContainer(MessageListenerAdapter followerListener,
+                                                 ProjectViewEventListener projectViewEventListener) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(jedisConnectionFactory());
         container.addMessageListener(followerListener, followerTopic());
+        container.addMessageListener(projectViewEventListener, profileViewTopic());
         return container;
     }
 }
